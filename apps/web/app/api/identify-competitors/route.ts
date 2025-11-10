@@ -32,11 +32,11 @@ export async function POST(request: Request) {
     const supabase = createSponsorshipServerClient();
 
     // Fetch all brands from database
-    // Reduced limit to prevent timeout on Netlify (10s free tier, 26s paid)
+    // Severely reduced limit to prevent timeout on Netlify (10s free tier, 26s paid)
     const { data: brands, error: brandsError } = await supabase
       .from('brands')
       .select('id, name, website, description')
-      .limit(200); // Reduced from 1000 to prevent timeout
+      .limit(50); // Reduced to 50 to ensure completion within timeout limits
 
     if (brandsError) {
       throw new Error(`Failed to fetch brands: ${brandsError.message}`);
@@ -58,21 +58,21 @@ export async function POST(request: Request) {
     }>;
 
     // Batch process brands to reduce API calls
-    // Reduced batch size to process faster and avoid timeouts
+    // Small batch size to process quickly and avoid timeouts
     const competitors: CompetitorCandidate[] = [];
-    const batchSize = 25; // Reduced from 50 to process faster and avoid timeouts
+    const batchSize = 10; // Small batches to process quickly and stay within timeout
 
     for (let i = 0; i < brandsData.length; i += batchSize) {
       const batch = brandsData.slice(i, i + batchSize);
       
       try {
-        // Prepare batch prompt with all brands
+        // Prepare batch prompt with all brands (truncated for speed)
         const brandsList = batch.map((brand, idx) => {
           const brandInfo = [
             `${idx + 1}. ${brand.name}`,
             brand.website ? `   Website: ${brand.website}` : '',
             brand.description 
-              ? `   Description: ${brand.description.substring(0, 300)}${brand.description.length > 300 ? '...' : ''}`
+              ? `   Description: ${brand.description.substring(0, 150)}${brand.description.length > 150 ? '...' : ''}`
               : '   Description: No description available',
           ].filter(Boolean).join('\n');
           return brandInfo;
@@ -97,7 +97,7 @@ For the description, create a very concise one-sentence summary (under 100 chara
 
 Return ONLY a valid JSON array, no other text.`;
 
-        const userMessage = `Analyze these ${batch.length} brands:\n\n${brandsList}\n\nReturn a JSON array with analysis for each brand.`;
+        const userMessage = `Analyze ${batch.length} brands:\n\n${brandsList}\n\nReturn JSON array.`;
 
         // Single API call for the entire batch
         const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -109,7 +109,7 @@ Return ONLY a valid JSON array, no other text.`;
           },
           body: JSON.stringify({
             model: 'claude-3-haiku-20240307',
-            max_tokens: 4096, // Maximum allowed for Haiku model
+            max_tokens: 2000, // Reduced from 4096 to speed up response
             system: systemPrompt,
             messages: [
               {
@@ -169,9 +169,9 @@ Return ONLY a valid JSON array, no other text.`;
           console.error(`Failed to parse analyses for batch ${i / batchSize + 1}:`, parseError);
         }
 
-        // Small delay between batches to avoid rate limits
-        if (i + batchSize < brands.length) {
-          await new Promise(resolve => setTimeout(resolve, 500)); // Reduced delay since fewer calls
+        // Small delay between batches to avoid rate limits, but keep it minimal for speed
+        if (i + batchSize < brandsData.length) {
+          await new Promise(resolve => setTimeout(resolve, 200)); // Minimal delay to stay fast
         }
       } catch (error) {
         console.error(`Error processing batch ${i / batchSize + 1}:`, error);
