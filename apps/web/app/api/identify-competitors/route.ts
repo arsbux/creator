@@ -78,24 +78,7 @@ export async function POST(request: Request) {
           return brandInfo;
         }).join('\n\n');
 
-        const systemPrompt = `You are a competitive intelligence analyst. Analyze multiple brands and determine which are competitors to a company in a specific industry.
-
-Target Industry: ${industry}
-Target Company Description: ${company_description || 'Not provided'}
-
-For each brand in the list, determine if it operates in the same industry and could be considered a competitor.
-
-You must return a JSON array with exactly ${batch.length} items, one for each brand in order. Each item should have:
-- "brand_index": the index number (0-based) matching the brand's position in the list
-- "is_competitor": true/false
-- "similarity_score": 0-100 (percentage of how similar/competitive they are)
-- "description": a brief 1 sentence (max 100 characters) description of what this company does
-- "reasoning": brief one-sentence explanation of why it is/isn't a competitor
-
-Be strict - only mark as competitor if they are truly in the same industry and could compete for the same customers.
-For the description, create a very concise one-sentence summary (under 100 characters) of the company's business.
-
-Return ONLY a valid JSON array, no other text.`;
+        const systemPrompt = `Analyze brands for competitors. Industry: ${industry}. Company: ${company_description || 'N/A'}. Return JSON array with ${batch.length} items. Each: {"brand_index": 0-based, "is_competitor": bool, "similarity_score": 0-100, "description": "max 80 chars", "reasoning": "brief"}. Be strict - only true competitors. JSON only.`;
 
         const userMessage = `Analyze ${batch.length} brands:\n\n${brandsList}\n\nReturn JSON array.`;
 
