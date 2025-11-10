@@ -32,10 +32,11 @@ export async function POST(request: Request) {
     const supabase = createSponsorshipServerClient();
 
     // Fetch all brands from database
+    // Reduced limit to prevent timeout on Netlify (10s free tier, 26s paid)
     const { data: brands, error: brandsError } = await supabase
       .from('brands')
       .select('id, name, website, description')
-      .limit(1000); // Limit to prevent timeout, can be paginated later
+      .limit(200); // Reduced from 1000 to prevent timeout
 
     if (brandsError) {
       throw new Error(`Failed to fetch brands: ${brandsError.message}`);
@@ -57,9 +58,9 @@ export async function POST(request: Request) {
     }>;
 
     // Batch process brands to reduce API calls
-    // Instead of 1 API call per brand, we'll analyze 50 brands per API call
+    // Reduced batch size to process faster and avoid timeouts
     const competitors: CompetitorCandidate[] = [];
-    const batchSize = 50; // Analyze 50 brands per API call (reduces from 1000 calls to ~20 calls)
+    const batchSize = 25; // Reduced from 50 to process faster and avoid timeouts
 
     for (let i = 0; i < brandsData.length; i += batchSize) {
       const batch = brandsData.slice(i, i + batchSize);
@@ -193,6 +194,18 @@ Return ONLY a valid JSON array, no other text.`;
     });
   } catch (error: any) {
     console.error('Error identifying competitors:', error);
+    
+    // Check if it's a timeout error
+    if (error.message?.includes('timeout') || error.name === 'TimeoutError') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Request timed out. The analysis is taking longer than expected. Please try again with a smaller dataset or contact support.',
+        },
+        { status: 504 }
+      );
+    }
+    
     return NextResponse.json(
       {
         success: false,

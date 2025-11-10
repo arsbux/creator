@@ -88,11 +88,27 @@ export default function ResultsPage() {
         });
 
         if (!competitorsResponse.ok) {
-          const errorData = await competitorsResponse.json();
-          throw new Error(errorData.error || 'Failed to identify competitors');
+          let errorMessage = 'Failed to identify competitors';
+          try {
+            const errorData = await competitorsResponse.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            // If response is not JSON (e.g., timeout), use status text
+            if (competitorsResponse.status === 504) {
+              errorMessage = 'Request timed out. The competitor analysis is taking longer than expected. Please try again or contact support.';
+            } else {
+              errorMessage = `Server error: ${competitorsResponse.status} ${competitorsResponse.statusText}`;
+            }
+          }
+          throw new Error(errorMessage);
         }
 
-        const competitorsData = await competitorsResponse.json();
+        let competitorsData;
+        try {
+          competitorsData = await competitorsResponse.json();
+        } catch (e) {
+          throw new Error('Invalid response from server. The request may have timed out.');
+        }
         setCompetitors(competitorsData.competitors);
 
         if (competitorsData.competitors.length === 0) {
