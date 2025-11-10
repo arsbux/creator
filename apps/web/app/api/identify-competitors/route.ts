@@ -32,11 +32,11 @@ export async function POST(request: Request) {
     const supabase = createSponsorshipServerClient();
 
     // Fetch all brands from database
-    // Severely reduced limit to prevent timeout on Netlify (10s free tier, 26s paid)
+    // Minimal limit to ensure fast completion within timeout limits
     const { data: brands, error: brandsError } = await supabase
       .from('brands')
       .select('id, name, website, description')
-      .limit(50); // Reduced to 50 to ensure completion within timeout limits
+      .limit(20); // Minimal set to complete quickly
 
     if (brandsError) {
       throw new Error(`Failed to fetch brands: ${brandsError.message}`);
@@ -58,29 +58,22 @@ export async function POST(request: Request) {
     }>;
 
     // Batch process brands to reduce API calls
-    // Small batch size to process quickly and avoid timeouts
+    // Very small batch size for fastest processing
     const competitors: CompetitorCandidate[] = [];
-    const batchSize = 10; // Small batches to process quickly and stay within timeout
+    const batchSize = 5; // Very small batches for fastest processing
 
     for (let i = 0; i < brandsData.length; i += batchSize) {
       const batch = brandsData.slice(i, i + batchSize);
       
       try {
-        // Prepare batch prompt with all brands (truncated for speed)
+        // Prepare minimal batch prompt for speed
         const brandsList = batch.map((brand, idx) => {
-          const brandInfo = [
-            `${idx + 1}. ${brand.name}`,
-            brand.website ? `   Website: ${brand.website}` : '',
-            brand.description 
-              ? `   Description: ${brand.description.substring(0, 150)}${brand.description.length > 150 ? '...' : ''}`
-              : '   Description: No description available',
-          ].filter(Boolean).join('\n');
-          return brandInfo;
-        }).join('\n\n');
+          return `${idx + 1}. ${brand.name}${brand.website ? ` (${brand.website})` : ''}`;
+        }).join('\n');
 
-        const systemPrompt = `Analyze brands for competitors. Industry: ${industry}. Company: ${company_description || 'N/A'}. Return JSON array with ${batch.length} items. Each: {"brand_index": 0-based, "is_competitor": bool, "similarity_score": 0-100, "description": "max 80 chars", "reasoning": "brief"}. Be strict - only true competitors. JSON only.`;
+        const systemPrompt = `Find competitors. Industry: ${industry}. Return JSON: [{"brand_index": 0, "is_competitor": true/false, "similarity_score": 0-100, "description": "max 60 chars"}]. JSON only.`;
 
-        const userMessage = `Analyze ${batch.length} brands:\n\n${brandsList}\n\nReturn JSON array.`;
+        const userMessage = `Brands:\n${brandsList}\n\nReturn JSON array.`;
 
         // Single API call for the entire batch
         const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -92,7 +85,7 @@ export async function POST(request: Request) {
           },
           body: JSON.stringify({
             model: 'claude-3-haiku-20240307',
-            max_tokens: 2000, // Reduced from 4096 to speed up response
+            max_tokens: 1000, // Minimal tokens for fastest response
             system: systemPrompt,
             messages: [
               {
@@ -152,10 +145,7 @@ export async function POST(request: Request) {
           console.error(`Failed to parse analyses for batch ${i / batchSize + 1}:`, parseError);
         }
 
-        // Small delay between batches to avoid rate limits, but keep it minimal for speed
-        if (i + batchSize < brandsData.length) {
-          await new Promise(resolve => setTimeout(resolve, 200)); // Minimal delay to stay fast
-        }
+        // No delay - process as fast as possible
       } catch (error) {
         console.error(`Error processing batch ${i / batchSize + 1}:`, error);
         // Continue with next batch even if this one fails
@@ -166,8 +156,8 @@ export async function POST(request: Request) {
     // Sort by similarity score (highest first)
     competitors.sort((a, b) => b.similarityScore - a.similarityScore);
 
-    // Return top 20 competitors
-    const topCompetitors = competitors.slice(0, 20);
+    // Return top 15 competitors
+    const topCompetitors = competitors.slice(0, 15);
 
     return NextResponse.json({
       success: true,
@@ -177,17 +167,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Error identifying competitors:', error);
-    
-    // Check if it's a timeout error
-    if (error.message?.includes('timeout') || error.name === 'TimeoutError') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Request timed out. The analysis is taking longer than expected. Please try again with a smaller dataset or contact support.',
-        },
-        { status: 504 }
-      );
-    }
     
     return NextResponse.json(
       {

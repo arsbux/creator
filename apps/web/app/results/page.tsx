@@ -92,23 +92,13 @@ export default function ResultsPage() {
           try {
             const errorData = await competitorsResponse.json();
             errorMessage = errorData.error || errorMessage;
-          } catch (e) {
-            // If response is not JSON (e.g., timeout), use status text
-            if (competitorsResponse.status === 504) {
-              errorMessage = 'Request timed out. The competitor analysis is taking longer than expected. Please try again or contact support.';
-            } else {
-              errorMessage = `Server error: ${competitorsResponse.status} ${competitorsResponse.statusText}`;
-            }
+          } catch {
+            errorMessage = `Server error: ${competitorsResponse.status} ${competitorsResponse.statusText}`;
           }
           throw new Error(errorMessage);
         }
 
-        let competitorsData;
-        try {
-          competitorsData = await competitorsResponse.json();
-        } catch (e) {
-          throw new Error('Invalid response from server. The request may have timed out.');
-        }
+        const competitorsData = await competitorsResponse.json();
         setCompetitors(competitorsData.competitors);
 
         if (competitorsData.competitors.length === 0) {
