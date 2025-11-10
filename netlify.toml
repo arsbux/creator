@@ -11,8 +11,5 @@
 
 # Note: Netlify free tier has 10s timeout, paid plans up to 26s for regular functions
 # For longer operations, consider using background functions or reducing batch size
-[functions]
-  # Increase timeout for long-running competitor identification (requires paid plan)
-  # Maximum is 26 seconds for regular functions, 10 minutes for background functions
-  timeout = 26
+# Timeout configuration for Next.js API routes is handled by the plugin
 
