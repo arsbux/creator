@@ -1,0 +1,14 @@
+{
+  "name": "competitor-creator-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd apps/web && next dev",
+    "build": "cd apps/web && next build",
+    "lint": "cd apps/web && next lint",
+    "type-check": "cd apps/web && tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
